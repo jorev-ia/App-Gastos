@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor de Gastos Diarios</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        /* Oculta los controles de entrada de números en algunos navegadores */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] { 
+            -moz-appearance: textfield; 
+        }
+        /* Estilos del modal de confirmación */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 400px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center py-6 px-2 sm:px-6 lg:px-8">
+    <div class="max-w-4xl w-full bg-white shadow-xl rounded-lg p-4 sm:p-8 space-y-6 sm:space-y-8">
+        <!-- Título - Más pequeño en móviles (sm:text-3xl) -->
+        <div class="text-center">
+            <h1 class="text-xl sm:text-3xl font-bold text-gray-900">Gestor de Gastos e Ingresos</h1>
+        </div>
+
+        <!-- Contenedor del Gasto Máximo Doble -->
+        <div class="mt-4 p-4 rounded-xl shadow-inner bg-blue-50 space-y-4">
+            <div id="gastoMaximoInputContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Gasto Efectivo/Débito -->
+                <div>
+                    <label for="gastoMaximoEfectivo" class="block text-sm font-medium text-blue-700 text-left">Gasto Efectivo/Débito Max (S/)</label>
+                    <input type="number" id="gastoMaximoEfectivo" step="0.01" inputmode="decimal" class="mt-1 block w-full px-3 py-2 border border-blue-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                </div>
+                <!-- Gasto Crédito -->
+                <div>
+                    <label for="gastoMaximoCredito" class="block text-sm font-medium text-blue-700 text-left">Gasto Crédito Max (S/)</label>
+                    <input type="number" id="gastoMaximoCredito" step="0.01" inputmode="decimal" class="mt-1 block w-full px-3 py-2 border border-blue-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                </div>
+                <!-- Botón para establecer -->
+                <button onclick="guardarGastoMaximo()" class="col-span-1 md:col-span-2 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    Establecer
+                </button>
+            </div>
+
+            <div id="gastoMaximoDisplayContainer" class="hidden">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Display Gasto Efectivo/Débito -->
+                    <div class="p-3 bg-white rounded-lg border border-blue-200">
+                        <span class="text-xs font-medium text-blue-700 block">Restante Efectivo/Débito:</span>
+                        <span id="montoRestanteEfectivo" class="text-xl font-bold text-blue-600">S/ 0.00</span>
+                    </div>
+                    <!-- Display Gasto Crédito -->
+                    <div class="p-3 bg-white rounded-lg border border-blue-200">
+                        <span class="text-xs font-medium text-blue-700 block">Restante Crédito:</span>
+                        <span id="montoRestanteCredito" class="text-xl font-bold text-blue-600">S/ 0.00</span>
+                    </div>
+                </div>
+                <!-- Botón de Editar (Se muestra debajo en móvil) -->
+                <div class="text-center mt-3">
+                    <button onclick="editarGastoMaximo()" class="py-1 px-3 border border-blue-400 rounded-md shadow-sm text-xs font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Editar Montos Máximos
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Formulario de Ingreso -->
+        <form id="transaccionForm" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Campo de Fecha -->
+                <div>
+                    <label for="fecha" class="block text-sm font-medium text-gray-700">Fecha</label>
+                    <input type="date" id="fecha" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+
+                <!-- Campo de Monto -->
+                <div>
+                    <label for="monto" class="block text-sm font-medium text-gray-700">Monto (S/)</label>
+                    <!-- inputmode="decimal" para mostrar teclado numérico en móvil -->
+                    <input type="number" id="monto" step="0.01" inputmode="decimal" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+
+                <!-- Campo de Tipo -->
+                <div>
+                    <label for="tipo" class="block text-sm font-medium text-gray-700">Tipo</label>
+                    <select id="tipo" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        <option value="gasto">Gasto</option>
+                        <option value="ingreso">Ingreso</option>
+                    </select>
+                </div>
+
+                <!-- Campo de Banco/Medio Actualizado -->
+                <div>
+                    <label for="banco" class="block text-sm font-medium text-gray-700">Banco / Medio</label>
+                    <select id="banco" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        <option value="Efectivo o YAPE">Efectivo o YAPE</option>
+                        <option value="BBVA credito">BBVA Crédito</option>
+                        <option value="CMR credito">CMR Crédito</option>
+                        <option value="OH credito">OH Crédito</option>
+                        <option value="BCP">BCP (Débito)</option>
+                        <option value="Banbif">Banbif (Débito)</option>
+                        <option value="Interbank">Interbank (Débito)</option>
+                        <option value="Paypal">Paypal (Asume Débito/Efectivo)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Campo de Detalle -->
+            <div>
+                <label for="detalle" class="block text-sm font-medium text-gray-700">Detalle</label>
+                <textarea id="detalle" rows="3" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
+            </div>
+
+            <!-- Botón de Guardar -->
+            <div>
+                <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Guardar Transacción
+                </button>
+            </div>
+        </form>
+        
+        <!-- CUADRO DE PAGOS PENDIENTES DE CRÉDITO -->
+        <div class="mt-8 p-4 rounded-xl shadow-lg bg-white border border-red-100">
+            <h2 class="text-xl font-bold text-red-700 mb-4">📢 Pagos de Tarjeta de Crédito Pendientes</h2>
+            <div id="resumenPagosCreditoContainer" class="space-y-4">
+                <p class="text-sm text-gray-500 text-center">Calculando gastos de crédito por ciclo...</p>
+            </div>
+        </div>
+
+        <!-- Lista de Transacciones y Botón de Exportar -->
+        <div class="mt-8">
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
+                <h2 class="text-xl font-semibold text-gray-900">Historial de Transacciones</h2>
+                <div class="flex gap-2">
+                    <!-- Botones más pequeños en móvil (py-1 px-2 text-xs) -->
+                    <button onclick="exportarCSV()" class="py-1 px-2 text-xs sm:py-2 sm:px-4 sm:text-sm border border-transparent rounded-md shadow-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                        Exportar
+                    </button>
+                    <button onclick="mostrarConfirmacionReiniciar()" class="py-1 px-2 text-xs sm:py-2 sm:px-4 sm:text-sm border border-transparent rounded-md shadow-sm font-medium text-white bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400">
+                        Reiniciar
+                    </button>
+                </div>
+            </div>
+            <!-- Contenedor con overflow-x-auto para scroll horizontal en móvil -->
+            <div class="shadow overflow-x-auto sm:rounded-lg">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Detalle</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Banco</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="listaTransacciones" class="bg-white divide-y divide-gray-200">
+                        <!-- Las transacciones se renderizarán aquí -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Balance Actual movido al final -->
+        <div class="mt-8 p-4 rounded-xl shadow-inner bg-gray-50 flex justify-between items-center">
+            <span class="text-base font-medium text-gray-700">Balance Actual:</span>
+            <span id="balanceTotal" class="text-xl font-bold text-green-600">S/ 0.00</span>
+        </div>
+        
+        <!-- Información de Ciclos de Tarjeta de Crédito (Cuadro Informativo) -->
+        <div class="mt-8 p-4 rounded-xl shadow-inner bg-gray-50 border border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 border-b pb-2">🗓️ Ciclos de Facturación de Tarjetas</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                <div>
+                    <p class="font-bold text-blue-600">BBVA Crédito</p>
+                    <p>Facturación: Día 11 al 10</p>
+                    <p class="font-semibold text-red-500">Pago Límite: Día 06</p>
+                </div>
+                <div>
+                    <p class="font-bold text-green-600">CMR Crédito</p>
+                    <p>Facturación: Día 15 al 14</p>
+                    <p class="font-semibold text-red-500">Pago Límite: Día 10</p>
+                </div>
+                <div>
+                    <p class="font-bold text-red-600">OH Crédito</p>
+                    <p>Facturación: Día 05 al 04</p>
+                    <p class="font-semibold text-red-500">Pago Límite: Día 01</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal de Confirmación -->
+    <div id="confirmacionModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">¿Estás seguro?</h3>
+            <p class="text-sm text-gray-600 mb-6">Esta acción borrará todas tus transacciones y tu gasto máximo.</p>
+            <div class="flex justify-end gap-3">
+                <button id="cancelarReiniciarBtn" class="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400">
+                    Cancelar
+                </button>
+                <button id="confirmarReiniciarBtn" class="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                    Confirmar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Referencias a elementos del DOM
+        const transaccionForm = document.getElementById('transaccionForm');
+        const fechaInput = document.getElementById('fecha');
+        const montoInput = document.getElementById('monto');
+        const tipoInput = document.getElementById('tipo');
+        const bancoInput = document.getElementById('banco');
+        const detalleInput = document.getElementById('detalle');
+        const listaTransacciones = document.getElementById('listaTransacciones');
+        const balanceTotalSpan = document.getElementById('balanceTotal');
+        
+        // Gasto Máximo Inputs y Displays
+        const gastoMaximoInputEfectivo = document.getElementById('gastoMaximoEfectivo');
+        const gastoMaximoInputCredito = document.getElementById('gastoMaximoCredito');
+        const montoRestanteEfectivoSpan = document.getElementById('montoRestanteEfectivo');
+        const montoRestanteCreditoSpan = document.getElementById('montoRestanteCredito');
+        const gastoMaximoInputContainer = document.getElementById('gastoMaximoInputContainer');
+        const gastoMaximoDisplayContainer = document.getElementById('gastoMaximoDisplayContainer');
+        
+        // Referencias a elementos del modal
+        const confirmacionModal = document.getElementById('confirmacionModal');
+        const confirmarReiniciarBtn = document.getElementById('confirmarReiniciarBtn');
+        const cancelarReiniciarBtn = document.getElementById('cancelarReiniciarBtn');
+
+        // Definición de medios de pago por categoría
+        const MEDIOS_CREDITO = ['BBVA credito', 'CMR credito', 'OH credito'];
+        
+        // Configuración de ciclos de crédito (Día final de facturación y día de pago)
+        const CICLOS_CREDITO = {
+            'BBVA credito': { facturacionDiaFin: 10, pagoDia: 6 }, // Ciclo: Día 11 al 10. Pago: Día 6 del mes de pago.
+            'CMR credito': { facturacionDiaFin: 14, pagoDia: 10 }, // Ciclo: Día 15 al 14. Pago: Día 10 del mes de pago.
+            'OH credito': { facturacionDiaFin: 4, pagoDia: 1 },    // Ciclo: Día 5 al 4. Pago: Día 1 del mes de pago.
+        };
+        
+        // Variables para los gastos máximos
+        let gastoMaximoEfectivo = parseFloat(localStorage.getItem('gastoMaximoEfectivo')) || 0;
+        let gastoMaximoCredito = parseFloat(localStorage.getItem('gastoMaximoCredito')) || 0;
+        
+        // Inicializar la fecha al día de hoy
+        fechaInput.valueAsDate = new Date();
+
+        // Array para almacenar las transacciones
+        let transacciones = JSON.parse(localStorage.getItem('transacciones')) || [];
+
+        // Función auxiliar para determinar si un banco es de crédito
+        function esMedioCredito(banco) {
+            return MEDIOS_CREDITO.includes(banco);
+        }
+        
+        // Función para obtener los detalles del ciclo de facturación y fecha de pago
+        function getCreditCardDetails(dateString, cardType) {
+            if (!MEDIOS_CREDITO.includes(cardType)) return null;
+
+            const factura = CICLOS_CREDITO[cardType];
+            const transaccionDate = new Date(dateString + 'T00:00:00'); // Tratar como fecha local
+            
+            if (isNaN(transaccionDate.getTime())) return null;
+
+            const diaTransaccion = transaccionDate.getDate();
+            let mesTransaccion = transaccionDate.getMonth();
+            let anioTransaccion = transaccionDate.getFullYear();
+
+            const cicloFinDia = factura.facturacionDiaFin;
+            //const cicloInicioDia = factura.facturacionDiaFin + 1; // El día siguiente es el inicio del ciclo
+
+            let cicloInicio;
+            let cicloFin;
+            let fechaPago;
+
+            // 1. Determinar el Ciclo (Facturation period)
+            if (diaTransaccion > cicloFinDia) {
+                // Transacción hecha DESPUÉS del cierre: Entra en el ciclo que cierra el MES SIGUIENTE
+                // El ciclo inicia el día siguiente al cierre anterior (facturacionDiaFin + 1) en el mes actual
+                cicloInicio = new Date(anioTransaccion, mesTransaccion, cicloFinDia + 1); 
+                // El ciclo cierra el facturacionDiaFin del mes siguiente
+                cicloFin = new Date(anioTransaccion, mesTransaccion + 1, cicloFinDia); 
+                
+                // La fecha de pago es DOS meses después de la transacción
+                fechaPago = new Date(anioTransaccion, mesTransaccion + 2, factura.pagoDia);
+            } else {
+                // Transacción hecha ANTES o EN el cierre: Entra en el ciclo que cierra ESTE MES
+                // El ciclo inicia el día siguiente al cierre anterior (facturacionDiaFin + 1) del mes pasado
+                cicloInicio = new Date(anioTransaccion, mesTransaccion - 1, cicloFinDia + 1); 
+                // El ciclo cierra el facturacionDiaFin del mes actual
+                cicloFin = new Date(anioTransaccion, mesTransaccion, cicloFinDia); 
+                
+                // La fecha de pago es UN mes después del cierre
+                fechaPago = new Date(anioTransaccion, mesTransaccion + 1, factura.pagoDia);
+            }
+            
+            // Función para formatear la fecha a dd/mm/yyyy
+            const formatDisplay = (date) => `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
+            // Función para formatear la fecha a YYYY-MM-DD para la clave (facilita la ordenación)
+            const formatKey = (date) => date.toISOString().split('T')[0];
+
+            return {
+                card: cardType,
+                fechaPagoKey: formatKey(fechaPago),
+                cicloDisplay: `${formatDisplay(cicloInicio)} - ${formatDisplay(cicloFin)}`,
+                pagoDisplay: formatDisplay(fechaPago)
+            };
+        }
+
+        // Función para renderizar el listado de transacciones
+        function renderTransacciones() {
+            // Limpiar la lista existente
+            listaTransacciones.innerHTML = '';
+            
+            transacciones.forEach((transaccion, index) => {
+                const fila = document.createElement('tr');
+                const montoColor = transaccion.tipo === 'gasto' ? 'text-red-600' : 'text-green-600';
+                const montoTexto = transaccion.tipo === 'gasto' ? `- S/ ${transaccion.monto}` : `+ S/ ${transaccion.monto}`;
+                const tipoColor = transaccion.tipo === 'gasto' ? 'text-red-600' : 'text-green-600';
+
+                fila.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${transaccion.fecha}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${transaccion.detalle}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium ${montoColor}">${montoTexto}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium ${tipoColor}">${transaccion.tipo === 'gasto' ? 'Gasto' : 'Ingreso'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${transaccion.banco}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <button onclick="eliminarTransaccion(${index})" class="text-red-500 hover:text-red-700">
+                            Eliminar
+                        </button>
+                    </td>
+                `;
+                listaTransacciones.appendChild(fila);
+            });
+            actualizarUI(); // Llamada central para actualizar todos los componentes
+        }
+        
+        // Función para renderizar el resumen de pagos de crédito
+        function renderPagosCredito() {
+            const pagosPendientes = {}; // Key: FechaPago (YYYY-MM-DD), Value: { date: 'DD/MM/YYYY', cards: { [CardType]: { total: amount, cicloDisplay: 'D1 - D2' } } }
+
+            transacciones
+                .filter(t => t.tipo === 'gasto' && MEDIOS_CREDITO.includes(t.banco))
+                .forEach(t => {
+                    const details = getCreditCardDetails(t.fecha, t.banco);
+                    if (!details) return;
+
+                    const monto = parseFloat(t.monto);
+                    const fechaPagoKey = details.fechaPagoKey;
+
+                    if (!pagosPendientes[fechaPagoKey]) {
+                        pagosPendientes[fechaPagoKey] = {
+                            date: details.pagoDisplay,
+                            cards: {}
+                        };
+                    }
+
+                    if (!pagosPendientes[fechaPagoKey].cards[t.banco]) {
+                        pagosPendientes[fechaPagoKey].cards[t.banco] = {
+                            total: 0,
+                            cicloDisplay: details.cicloDisplay
+                        };
+                    }
+
+                    pagosPendientes[fechaPagoKey].cards[t.banco].total += monto;
+                });
+
+            // Ordenar por fecha de pago
+            const sortedPagos = Object.keys(pagosPendientes).sort();
+
+            const container = document.getElementById('resumenPagosCreditoContainer');
+            container.innerHTML = '';
+            
+            if (sortedPagos.length === 0) {
+                container.innerHTML = '<p class="text-sm text-gray-500 text-center">No hay gastos de crédito pendientes para el pago.</p>';
+                return;
+            }
+
+            sortedPagos.forEach(fechaPagoKey => {
+                const pagoInfo = pagosPendientes[fechaPagoKey];
+                let cardsHtml = '';
+                let totalPago = 0;
+
+                // Display individual card payments for this due date
+                for (const cardType in pagoInfo.cards) {
+                    const cardData = pagoInfo.cards[cardType];
+                    totalPago += cardData.total;
+                    const cardName = cardType.replace(' credito', '');
+                    cardsHtml += `
+                        <p class="text-xs text-gray-700 mt-1">
+                            <span class="font-semibold">${cardName}:</span> S/ ${cardData.total.toFixed(2)} 
+                            <span class="text-gray-400 text-xs italic">(Ciclo: ${cardData.cicloDisplay})</span>
+                        </p>
+                    `;
+                }
+
+                const pagoDiv = document.createElement('div');
+                pagoDiv.className = 'p-4 border border-red-300 rounded-lg bg-red-50 shadow-md mb-4';
+                pagoDiv.innerHTML = `
+                    <div class="flex justify-between items-center border-b pb-2 mb-2 border-red-200">
+                        <h4 class="font-bold text-base text-red-700">PAGO VENCE: ${pagoInfo.date}</h4>
+                        <span class="text-lg font-extrabold text-red-800">TOTAL: S/ ${totalPago.toFixed(2)}</span>
+                    </div>
+                    ${cardsHtml}
+                `;
+                container.appendChild(pagoDiv);
+            });
+        }
+        
+        // Función central para actualizar toda la UI
+        function actualizarUI() {
+            actualizarBalance();
+            actualizarGastoProyectado();
+            renderPagosCredito();
+        }
+
+        // Función para actualizar el balance total
+        function actualizarBalance() {
+            const balance = transacciones.reduce((total, transaccion) => {
+                const monto = parseFloat(transaccion.monto);
+                return transaccion.tipo === 'ingreso' ? total + monto : total - monto;
+            }, 0);
+            
+            balanceTotalSpan.textContent = `S/ ${balance.toFixed(2)}`;
+            balanceTotalSpan.className = `text-xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`;
+        }
+        
+        // Función para actualizar el gasto proyectado (Doble límite)
+        function actualizarGastoProyectado() {
+            let totalGastosEfectivo = 0;
+            let totalGastosCredito = 0;
+
+            // Calcular gastos por categoría
+            transacciones
+                .filter(t => t.tipo === 'gasto')
+                .forEach(t => {
+                    const monto = parseFloat(t.monto);
+                    if (esMedioCredito(t.banco)) {
+                        totalGastosCredito += monto;
+                    } else {
+                        totalGastosEfectivo += monto;
+                    }
+                });
+
+            // Restante Efectivo
+            const restanteEfectivo = gastoMaximoEfectivo - totalGastosEfectivo;
+            montoRestanteEfectivoSpan.textContent = `S/ ${restanteEfectivo.toFixed(2)}`;
+            montoRestanteEfectivoSpan.className = `text-xl font-bold ${restanteEfectivo >= 0 ? 'text-blue-600' : 'text-red-600'}`;
+
+            // Restante Crédito
+            const restanteCredito = gastoMaximoCredito - totalGastosCredito;
+            montoRestanteCreditoSpan.textContent = `S/ ${restanteCredito.toFixed(2)}`;
+            montoRestanteCreditoSpan.className = `text-xl font-bold ${restanteCredito >= 0 ? 'text-blue-600' : 'text-red-600'}`;
+        }
+
+        // Función para guardar los gastos máximos en localStorage y actualizar UI
+        function guardarGastoMaximo() {
+            const valorEfectivo = parseFloat(gastoMaximoInputEfectivo.value);
+            const valorCredito = parseFloat(gastoMaximoInputCredito.value);
+
+            // Validación simple
+            if (isNaN(valorEfectivo) || isNaN(valorCredito) || valorEfectivo < 0 || valorCredito < 0) {
+                return;
+            }
+            
+            gastoMaximoEfectivo = valorEfectivo;
+            gastoMaximoCredito = valorCredito;
+
+            localStorage.setItem('gastoMaximoEfectivo', gastoMaximoEfectivo);
+            localStorage.setItem('gastoMaximoCredito', gastoMaximoCredito);
+            
+            actualizarGastoMaximoUI();
+            actualizarUI();
+        }
+        
+        // Función para alternar entre el modo de visualización y edición
+        function actualizarGastoMaximoUI() {
+            // Se muestra el display si al menos uno de los límites es mayor a cero
+            if (gastoMaximoEfectivo > 0 || gastoMaximoCredito > 0) {
+                gastoMaximoInputContainer.classList.add('hidden');
+                gastoMaximoDisplayContainer.classList.remove('hidden');
+            } else {
+                gastoMaximoInputContainer.classList.remove('hidden');
+                gastoMaximoDisplayContainer.classList.add('hidden');
+                gastoMaximoInputEfectivo.value = '';
+                gastoMaximoInputCredito.value = '';
+            }
+        }
+        
+        // Función para volver al modo de edición
+        function editarGastoMaximo() {
+            gastoMaximoInputEfectivo.value = gastoMaximoEfectivo;
+            gastoMaximoInputCredito.value = gastoMaximoCredito;
+            
+            // Se pone a cero para que la lógica de la UI vuelva a mostrar el formulario de entrada
+            gastoMaximoEfectivo = 0; 
+            gastoMaximoCredito = 0;
+            actualizarGastoMaximoUI();
+        }
+        
+        // Función para mostrar el modal de confirmación
+        function mostrarConfirmacionReiniciar() {
+            confirmacionModal.classList.remove('hidden');
+        }
+
+        // Función para reiniciar todos los datos guardados
+        function reiniciarTransacciones() {
+            // Eliminar los datos del localStorage
+            localStorage.removeItem('transacciones');
+            localStorage.removeItem('gastoMaximoEfectivo');
+            localStorage.removeItem('gastoMaximoCredito');
+            
+            // Reiniciar las variables en memoria
+            transacciones = [];
+            gastoMaximoEfectivo = 0;
+            gastoMaximoCredito = 0;
+            
+            // Ocultar el modal
+            confirmacionModal.classList.add('hidden');
+            
+            // Actualizar la interfaz (renderiza tabla y actualiza el resto)
+            renderTransacciones();
+            actualizarGastoMaximoUI();
+        }
+
+        // Escuchar los clics en los botones del modal
+        confirmarReiniciarBtn.addEventListener('click', reiniciarTransacciones);
+        cancelarReiniciarBtn.addEventListener('click', () => {
+            confirmacionModal.classList.add('hidden');
+        });
+
+
+        // Función para guardar las transacciones en localStorage
+        function guardarTransacciones() {
+            localStorage.setItem('transacciones', JSON.stringify(transacciones));
+        }
+
+        // Función para eliminar una transacción
+        function eliminarTransaccion(index) {
+            transacciones.splice(index, 1);
+            guardarTransacciones();
+            renderTransacciones(); // Re-renderiza y actualiza la UI
+        }
+        
+        // Manejador del evento de envío del formulario
+        transaccionForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const nuevaTransaccion = {
+                fecha: fechaInput.value,
+                monto: parseFloat(montoInput.value).toFixed(2),
+                tipo: tipoInput.value,
+                banco: bancoInput.value,
+                detalle: detalleInput.value
+            };
+
+            transacciones.unshift(nuevaTransaccion);
+            guardarTransacciones();
+            renderTransacciones(); // Re-renderiza y actualiza la UI
+
+            // Resetear el formulario y volver a establecer la fecha actual
+            transaccionForm.reset();
+            fechaInput.valueAsDate = new Date();
+        });
+        
+        // Función para exportar los datos a un archivo CSV
+        function exportarCSV() {
+            // Encabezados del archivo CSV
+            const headers = ["Fecha", "Monto", "Tipo", "Banco", "Detalle"];
+            
+            // Mapear los datos de las transacciones a un formato de fila de CSV
+            const csvRows = transacciones.map(t => {
+                // Escapar comillas dobles en el detalle para evitar problemas en el CSV
+                const escapedDetalle = t.detalle.replace(/"/g, '""');
+                return `"${t.fecha}","${t.monto}","${t.tipo}","${t.banco}","${escapedDetalle}"`;
+            });
+
+            // Unir los encabezados y las filas en una sola cadena de texto
+            const csvContent = [headers.join(','), ...csvRows].join('\n');
+            
+            // Crear un "Blob" para el archivo y un enlace de descarga temporal
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", "gastos-e-ingresos.csv");
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Cargar datos al iniciar la página
+        renderTransacciones();
+        actualizarGastoMaximoUI();
+    </script>
+</body>
+</html>
